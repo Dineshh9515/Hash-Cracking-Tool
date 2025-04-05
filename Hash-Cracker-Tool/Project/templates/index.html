@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hash Cracker Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .tab {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-top: none;
+        }
+        .tab-active {
+            display: block;
+        }
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 0;
+        }
+        .tab-btn {
+            background-color: #f1f1f1;
+            border: 1px solid #ccc;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        .tab-btn-active {
+            background-color: #ddd;
+            border-bottom: none;
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            display: none;
+        }
+        .file-upload {
+            margin: 15px 0;
+        }
+        progress {
+            width: 100%;
+            margin-top: 10px;
+            display: none;
+        }
+        .status {
+            font-style: italic;
+            color: #666;
+            margin-top: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hash Cracker Tool</h1>
+    
+    <div class="tab-buttons">
+        <button class="tab-btn tab-btn-active" onclick="openTab('single')">Single Hash</button>
+        <button class="tab-btn" onclick="openTab('multiple')">Multiple Hashes</button>
+        <button class="tab-btn" onclick="openTab('file')">File Upload</button>
+        <button class="tab-btn" onclick="openTab('folder')">Folder Upload</button>
+        <button class="tab-btn" onclick="openTab('suggestions')">Password Suggestions</button>
+    </div>
+    
+    <div id="single" class="tab tab-active">
+        <h2>Crack Single Hash</h2>
+        <input type="text" id="singleHash" placeholder="Enter hash value...">
+        <p class="status" id="singleStatus">Supported hash types: MD5 (32 chars), SHA1 (40 chars), SHA256 (64 chars), SHA384 (96 chars), SHA512 (128 chars)</p>
+        <button onclick="crackSingleHash()">Crack Hash</button>
+    </div>
+    
+    <div id="multiple" class="tab">
+        <h2>Crack Multiple Hashes</h2>
+        <textarea id="multipleHashes" rows="6" placeholder="Enter multiple hashes (one per line)..."></textarea>
+        <p class="status" id="multipleStatus">Supported hash types: MD5 (32 chars), SHA1 (40 chars), SHA256 (64 chars), SHA384 (96 chars), SHA512 (128 chars)</p>
+        <button onclick="crackMultipleHashes()">Crack Hashes</button>
+    </div>
+    
+    <div id="file" class="tab">
+        <h2>Upload File with Hashes</h2>
+        <p>Upload a text file containing hash values (one per line):</p>
+        <div class="file-upload">
+            <input type="file" id="hashFile" accept=".txt,.csv,.md">
+            <p class="status" id="fileStatus">The tool will automatically extract and attempt to crack any valid hashes found in the file.</p>
+            <button onclick="uploadHashFile()">Process File</button>
+        </div>
+    </div>
+    
+    <div id="folder" class="tab">
+        <h2>Upload Folder with Hash Files</h2>
+        <p>Upload a folder containing files with hash values:</p>
+        <div class="file-upload">
+            <input type="file" id="hashFolder" webkitdirectory directory multiple>
+            <p class="status" id="folderStatus">The tool will process all files in the folder and extract any valid hashes.</p>
+            <button onclick="uploadHashFolder()">Process Folder</button>
+        </div>
+    </div>
+    
+    <div id="suggestions" class="tab">
+        <h2>Password Suggestions</h2>
+        <input type="text" id="password" placeholder="Enter password to strengthen...">
+        <p class="status" id="passwordStatus">The tool will suggest stronger alternatives based on your password.</p>
+        <button onclick="getPasswordSuggestions()">Get Suggestions</button>
+    </div>
+    
+    <div id="result">
+        <h3>Results:</h3>
+        <div id="resultContent"></div>
+    </div>
+    
+    <progress id="progressBar" value="0" max="100"></progress>
+    
+    <script>
+        // Show status information on tab change
+        window.onload = function() {
+            document.querySelectorAll('.status').forEach(status => {
+                status.style.display = 'block';
+            });
+        };
+        
+        function openTab(tabName) {
+            // Hide all tabs
+            const tabs = document.getElementsByClassName('tab');
+            for (let i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('tab-active');
+            }
+            
+            // Remove active class from all buttons
+            const buttons = document.getElementsByClassName('tab-btn');
+            for (let i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove('tab-btn-active');
+            }
+            
+            // Show the selected tab
+            document.getElementById(tabName).classList.add('tab-active');
+            
+            // Add active class to the clicked button
+            event.currentTarget.classList.add('tab-btn-active');
+            
+            // Hide previous results
+            document.getElementById('result').style.display = 'none';
+        }
+        
+        function showResult(content) {
+            const resultDiv = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultContent.innerHTML = content;
+            resultDiv.style.display = 'block';
+        }
+        
+        function crackSingleHash() {
+            const hash = document.getElementById('singleHash').value.trim();
+            if (!hash) {
+                alert('Please enter a hash value');
+                return;
+            }
+            
+            // Validate hash format
+            if (!/^[a-fA-F0-9]{32,128}$/.test(hash)) {
+                alert('Invalid hash format. Please enter a valid MD5, SHA1, SHA256, SHA384, or SHA512 hash.');
+                return;
+            }
+            
+            showProgress();
+            
+            // Send hash to the Python script
+            fetch('/crack', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ type: 'single', hash: hash })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgress();
+                if (data.result) {
+                    showResult(`<p>Hash: ${hash}</p><p>Cracked value: <strong>${data.result}</strong></p>`);
+                } else {
+                    showResult(`<p>Could not crack hash: ${hash}</p><p>The hash was not found in any of our databases.</p>`);
+                }
+            })
+            .catch(error => {
+                hideProgress();
+                showResult(`<p>Error: ${error.message}</p>`);
+            });
+        }
+        
+        function crackMultipleHashes() {
+            const hashesText = document.getElementById('multipleHashes').value.trim();
+            if (!hashesText) {
+                alert('Please enter hash values');
+                return;
+            }
+            
+            const hashes = hashesText.split('\n')
+                .map(hash => hash.trim())
+                .filter(hash => hash && /^[a-fA-F0-9]{32,128}$/.test(hash));
+            
+            if (hashes.length === 0) {
+                alert('No valid hashes found. Please enter valid MD5, SHA1, SHA256, SHA384, or SHA512 hashes.');
+                return;
+            }
+            
+            showProgress();
+            
+            fetch('/crack', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ type: 'multiple', hashes: hashes })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgress();
+                let resultHTML = '<table border="1" style="width:100%; border-collapse: collapse;">';
+                resultHTML += '<tr><th>Hash</th><th>Cracked Value</th></tr>';
+                
+                for (const hash in data.results) {
+                    resultHTML += `<tr><td>${hash}</td><td>${data.results[hash] || 'Not found'}</td></tr>`;
+                }
+                
+                resultHTML += '</table>';
+                showResult(resultHTML);
+            })
+            .catch(error => {
+                hideProgress();
+                showResult(`<p>Error: ${error.message}</p>`);
+            });
+        }
+        
+        function uploadHashFile() {
+            const fileInput = document.getElementById('hashFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            showProgress();
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            fetch('/upload-file', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgress();
+                
+                if (Object.keys(data.results).length === 0) {
+                    showResult('<p>No valid hashes found in the file.</p>');
+                    return;
+                }
+                
+                let resultHTML = '<table border="1" style="width:100%; border-collapse: collapse;">';
+                resultHTML += '<tr><th>Hash</th><th>Cracked Value</th></tr>';
+                
+                for (const hash in data.results) {
+                    resultHTML += `<tr><td>${hash}</td><td>${data.results[hash] || 'Not found'}</td></tr>`;
+                }
+                
+                resultHTML += '</table>';
+                showResult(resultHTML);
+            })
+            .catch(error => {
+                hideProgress();
+                showResult(`<p>Error: ${error.message}</p>`);
+            });
+        }
+        
+        function uploadHashFolder() {
+            const folderInput = document.getElementById('hashFolder');
+            const files = folderInput.files;
+            
+            if (files.length === 0) {
+                alert('Please select a folder');
+                return;
+            }
+            
+            showProgress();
+            
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+                formData.append('paths', files[i].webkitRelativePath);
+            }
+            
+            fetch('/upload-folder', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgress();
+                
+                if (Object.keys(data.results).length === 0) {
+                    showResult('<p>No valid hashes found in any files.</p>');
+                    return;
+                }
+                
+                let resultHTML = '<table border="1" style="width:100%; border-collapse: collapse;">';
+                resultHTML += '<tr><th>File</th><th>Hash</th><th>Cracked Value</th></tr>';
+                
+                for (const file in data.results) {
+                    const fileResults = data.results[file];
+                    for (const hash in fileResults) {
+                        resultHTML += `<tr><td>${file}</td><td>${hash}</td><td>${fileResults[hash] || 'Not found'}</td></tr>`;
+                    }
+                }
+                
+                resultHTML += '</table>';
+                showResult(resultHTML);
+            })
+            .catch(error => {
+                hideProgress();
+                showResult(`<p>Error: ${error.message}</p>`);
+            });
+        }
+        
+        function getPasswordSuggestions() {
+            const password = document.getElementById('password').value.trim();
+            if (!password) {
+                alert('Please enter a password');
+                return;
+            }
+            
+            showProgress();
+            
+            fetch('/suggest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password: password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgress();
+                let resultHTML = '<h4>Stronger Password Suggestions:</h4><ul>';
+                
+                data.suggestions.forEach(suggestion => {
+                    resultHTML += `<li>${suggestion}</li>`;
+                });
+                
+                resultHTML += '</ul>';
+                showResult(resultHTML);
+            })
+            .catch(error => {
+                hideProgress();
+                showResult(`<p>Error: ${error.message}</p>`);
+            });
+        }
+        
+        function showProgress() {
+            document.getElementById('progressBar').style.display = 'block';
+            simulateProgress();
+        }
+        
+        function hideProgress() {
+            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('progressBar').value = 0;
+        }
+        
+        function simulateProgress() {
+            const progressBar = document.getElementById('progressBar');
+            let value = 0;
+            
+            const interval = setInterval(() => {
+                if (value >= 90) {
+                    clearInterval(interval);
+                    return;
+                }
+                
+                value += Math.random() * 10;
+                progressBar.value = Math.min(value, 90);
+            }, 300);
+        }
+    </script>
+</body>
+</html>
