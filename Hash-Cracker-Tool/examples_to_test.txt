@@ -1,0 +1,24 @@
+e10adc3949ba59abbe56e057f20f883e = "123456"
+5f4dcc3b5aa765d61d8327deb882cf99 = "password"
+21232f297a57a5a743894a0e4a801fc3 = "admin"
+d8578edf8458ce06fbc5bb76a58c5ca4 = "qwerty"
+5ebe2294ecd0e0f08eab7690d2a6ee69 = "secret"
+
+
+
+we can also implement using terminal without website by applying command mentioned below:
+Single hash test:
+python3 hash.py -s 5f4dcc3b5aa765d61d8327deb882cf99
+
+Testing from a file:
+python3 hash.py -f hashes0.txt
+
+Testing in a directory:
+python3 hash.py -d hashes_dir/
+
+Test with threading (for speed):
+python3 hash.py -f hashes.txt -t 8
+
+Suggest strong password variations:
+python3 hash.py -sp "mypassword"
+
